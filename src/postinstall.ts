@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as tar from 'tar';
 import * as unzipper from 'unzipper';
+import { fileURLToPath } from 'url';
 
 export type SupportedPlatform = 'darwin' | 'linux' | 'win32';
 export type SupportedArch = 'x64' | 'arm64';
@@ -34,13 +35,37 @@ export function getBinaryPattern(platform: SupportedPlatform, arch: SupportedArc
   throw new Error(`Unsupported platform/arch: ${platform}/${arch}`);
 }
 
+/**
+ * Get the current directory path compatible with both CommonJS and ESM
+ */
+function getCurrentDir(): string {
+  // Check if __dirname is available (CommonJS)
+  if (typeof __dirname !== 'undefined') {
+    return __dirname;
+  }
+  
+  // ESM fallback - use eval to avoid TypeScript compilation issues
+  try {
+    const importMeta = eval('import.meta');
+    if (importMeta && importMeta.url) {
+      return path.dirname(fileURLToPath(importMeta.url));
+    }
+  } catch {
+    // Fall through to default
+  }
+  
+  // Fallback to current working directory
+  return process.cwd();
+}
+
 export async function extractBinary() {
   if (isDevInstall()) {
     console.log('[oras-bin] Skipping binary extraction/cleanup (dev mode/CI detected)');
     return;
   }
-  const libDir = path.resolve(__dirname, '../lib');
-  const binDir = path.resolve(__dirname, '../.bin');
+  const currentDir = getCurrentDir();
+  const libDir = path.resolve(currentDir, '../lib');
+  const binDir = path.resolve(currentDir, '../.bin');
   if (!fs.existsSync(libDir)) {
     console.error('[oras-bin] ERROR: lib directory does not exist. Please add compressed oras binaries to lib/.');
     return;
