@@ -1,6 +1,6 @@
 {
   "name": "oras-bin-wrapper",
-  "version": "1.3.0",
+  "version": "0.0.0-tsup",
   "description": "Node.js wrapper for oras CLI binaries (cross-platform)",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
