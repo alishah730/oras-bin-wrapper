@@ -12,7 +12,7 @@
   "description": "",
   "dependencies": {
     "@types/node": "^22.15.2",
-    "oras-bin-wrapper": "^0.0.1-pre",
+    "oras-bin-wrapper": "0.0.0-tsup",
     "typescript": "^5.8.3"
   }
 }

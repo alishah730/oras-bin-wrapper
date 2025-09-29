@@ -1,15 +1,27 @@
 {
   "name": "oras-bin-wrapper",
-  "version": "1.3.0",
+  "version": "0.0.0-tsup",
   "description": "Node.js wrapper for oras CLI binaries (cross-platform)",
   "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+      
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "postinstall": "node postinstall.js || node dist/postinstall.js",
-    "test": "mocha -r ts-node/register test/**/*.ts"
+    "test": "mocha -r ts-node/register test/**/*.ts",
+    "test:cjs": "node test/test-cjs.js",
+    "test:esm": "node test/test-esm.mjs"
   },
   "files": [
     "dist",
@@ -39,6 +51,7 @@
     "assert": "^2.0.0",
     "mocha": "^10.0.0",
     "ts-node": "^10.0.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
