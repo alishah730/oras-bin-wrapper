@@ -2,6 +2,7 @@
   "name": "oras-ts-example",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "rm -rf dist && tsc && node dist/app.js"
     
