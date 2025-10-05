@@ -12,8 +12,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@types/node": "^22.15.2",
-    "oras-bin-wrapper": "0.0.0-tsup",
+    "@types/node": "^24.6.2",
+    "oras-bin-wrapper": "0.0.1-tsup",
     "typescript": "^5.8.3"
   }
 }
