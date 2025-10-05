@@ -63,6 +63,7 @@ jobs:
       - name: Publish to npm
         run: |
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          npm version $TAG_VERSION --no-git-tag-version
           if [[ $TAG_VERSION =~ -[a-zA-Z] ]]; then
             # Prerelease version - extract prerelease identifier
             PRERELEASE_TAG=$(echo $TAG_VERSION | sed -n 's/.*-\([a-zA-Z][a-zA-Z0-9]*\).*/\1/p')
