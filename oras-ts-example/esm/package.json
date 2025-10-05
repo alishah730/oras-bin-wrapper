@@ -1,0 +1,19 @@
+{
+  "name": "oras-ts-example",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "rm -rf dist && tsc && node dist/app.js"
+    
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@types/node": "^22.15.2",
+    "oras-bin-wrapper": "0.0.0-tsup",
+    "typescript": "^5.8.3"
+  }
+}
