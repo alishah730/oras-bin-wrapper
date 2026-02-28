@@ -10,8 +10,8 @@ describe('oras binary', function() {
       assert.ok(binaryPath, 'Binary path should be returned');
       assert.ok(typeof binaryPath === 'string', 'Binary path should be a string');
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Binary directory not found')) {
-        console.log('Binary directory not found - expected during development');
+      if (error instanceof Error && (error.message.includes('oras binary not found') || error.message.includes('Binary directory not found'))) {
+        console.log('Binary not found - expected during CI/development');
         this.skip();
       } else {
         throw error;
@@ -28,8 +28,8 @@ describe('oras binary', function() {
       assert.ok(binaryPath, 'Binary path should be returned');
       assert.ok(typeof binaryPath === 'string', 'Binary path should be a string');
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Binary directory not found')) {
-        console.log('Binary directory not found - expected during development');
+      if (error instanceof Error && (error.message.includes('oras binary not found') || error.message.includes('Binary directory not found'))) {
+        console.log('Binary not found - expected during CI/development');
         this.skip();
       } else {
         throw error;
@@ -43,8 +43,8 @@ describe('oras binary', function() {
       const defaultPath = orasFunction();
       assert.equal(functionPath, defaultPath, 'Function and default export should return the same path');
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Binary directory not found')) {
-        console.log('Binary directory not found - expected during development');
+      if (error instanceof Error && (error.message.includes('oras binary not found') || error.message.includes('Binary directory not found'))) {
+        console.log('Binary not found - expected during CI/development');
         this.skip();
       } else {
         throw error;
