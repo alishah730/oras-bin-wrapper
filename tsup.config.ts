@@ -33,4 +33,7 @@ export default defineConfig({
   
   // Platform target
   platform: 'node',
+  
+  // Shim __dirname for ESM
+  shims: true,
 })

@@ -1,5 +1,5 @@
 import { spawnSync } from 'child_process';
-import orasFunction, { getOrasBinaryPath } from '../src/index';
+import orasFunction, { getOrasBinaryPath } from '../dist/index';
 import { strict as assert } from 'assert';
 
 describe('oras binary', function() {

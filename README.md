@@ -53,11 +53,18 @@ const result = spawnSync(binaryPath, ['version'], { encoding: 'utf-8' });
 ```
 
 ## How it works
-- On install, only the binary matching your platform is kept in the `.bin/` folder.
+- On install, the binary matching your platform is extracted to `node_modules/.bin/oras` (making it available like any npm CLI tool).
 - The module exports the path to the binary for use with `child_process`.
+- All other platform binaries are deleted to reduce package size.
+
+## Supported Platforms
+- macOS (darwin) - Intel (x64) and Apple Silicon (arm64)
+- Linux - x64 and arm64
+- Windows - x64
 
 ## Updating Binaries
-- To update the oras binary, just replace the files in `.bin/` with new versions (keep the naming convention). No code changes required.
+- Run the `update-oras-binaries.sh` script to download the latest oras releases.
+- The postinstall script will automatically extract the correct binary for each user's platform.
 
 ## Features
 

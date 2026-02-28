@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-BIN_DIR="lib"  # Change to 'lib' if you want
+BIN_DIR="dist/lib"  # Change to 'lib' if you want
 mkdir -p "$BIN_DIR"
 
 # 1. Get latest stable (non-prerelease) version

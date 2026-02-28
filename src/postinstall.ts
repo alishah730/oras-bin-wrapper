@@ -3,22 +3,15 @@ import * as path from 'path';
 import * as os from 'os';
 import * as tar from 'tar';
 import * as unzipper from 'unzipper';
-import { fileURLToPath } from 'url';
 
 export type SupportedPlatform = 'darwin' | 'linux' | 'win32';
 export type SupportedArch = 'x64' | 'arm64';
 
 /**
  * Skips binary extraction in CI/CD and dev environments.
- * Ensures postinstall only runs for end users, never in CI or during publish.
+ * Set ORAS_BIN_DEV=true to skip binary extraction.
  */
 function isDevInstall(): boolean {
-  console.log('[oras-bin] Checking if this is a dev install...', process.env);
-  // return !(
-  //   process.env.ORAS_BIN_DEV ||
-  //   process.env.npm_lifecycle_event === 'build' ||
-  //   process.env.npm_config_argv?.includes('link')
-  // )
   return process.env.ORAS_BIN_DEV === 'true';
 }
 
@@ -36,36 +29,47 @@ export function getBinaryPattern(platform: SupportedPlatform, arch: SupportedArc
 }
 
 /**
- * Get the current directory path compatible with both CommonJS and ESM
+ * Get the package root directory.
+ * This works when running from postinstall.js at root or dist/postinstall.js
  */
-function getCurrentDir(): string {
-  // Check if __dirname is available (CommonJS)
-  if (typeof __dirname !== 'undefined') {
-    return __dirname;
+function getPackageDir(): string {
+  const currentDir = __dirname;
+  
+  // Check if we're in the dist folder
+  if (path.basename(currentDir) === 'dist') {
+    return path.dirname(currentDir);
   }
   
-  // ESM fallback - use eval to avoid TypeScript compilation issues
-  try {
-    const importMeta = eval('import.meta');
-    if (importMeta && importMeta.url) {
-      return path.dirname(fileURLToPath(importMeta.url));
-    }
-  } catch {
-    // Fall through to default
+  return currentDir;
+}
+
+/**
+ * Get the root project's node_modules/.bin directory.
+ * When installed as a dependency, this is: project/node_modules/.bin
+ * When running locally (dev), this is: oras-bin-wrapper/node_modules/.bin or oras-bin-wrapper/.bin
+ */
+function getRootBinDir(): string {
+  const packageDir = getPackageDir();
+  
+  // Check if we're installed as a dependency (inside node_modules/oras-bin-wrapper)
+  const parentDir = path.dirname(packageDir);
+  if (path.basename(parentDir) === 'node_modules') {
+    // We're in node_modules/oras-bin-wrapper, so root bin is node_modules/.bin
+    return path.join(parentDir, '.bin');
   }
   
-  // Fallback to current working directory
-  return process.cwd();
+  // Local development - use .bin in package directory
+  return path.join(packageDir, '.bin');
 }
 
 export async function extractBinary() {
   if (isDevInstall()) {
-    console.log('[oras-bin] Skipping binary extraction/cleanup (dev mode/CI detected)');
+    console.log('[oras-bin] Skipping binary extraction/cleanup (dev mode detected)');
     return;
   }
-  const currentDir = getCurrentDir();
-  const libDir = path.resolve(currentDir, '../lib');
-  const binDir = path.resolve(currentDir, '../.bin');
+  const packageDir = getPackageDir();
+  const libDir = path.join(packageDir, 'lib');
+  const binDir = getRootBinDir();
   if (!fs.existsSync(libDir)) {
     console.error('[oras-bin] ERROR: lib directory does not exist. Please add compressed oras binaries to lib/.');
     return;
@@ -74,44 +78,65 @@ export async function extractBinary() {
   const platform = os.platform() as SupportedPlatform;
   const arch = os.arch() as SupportedArch;
   const pattern = getBinaryPattern(platform, arch);
-  const files = fs.readdirSync(libDir);
-  console.log(`[oras-bin] Files in lib:`, files);
-  console.log(`[oras-bin] Extracting binary for platform: ${platform}, arch: ${arch}, pattern: ${pattern}`);
+  const files = fs.readdirSync(libDir).filter(f => !f.startsWith('.'));
+  
+  console.log(`[oras-bin] Extracting binary for ${platform}/${arch}`);
+  
   if (files.length === 0) {
-    console.error('[oras-bin] ERROR: No files found in lib directory.');
+    console.error('[oras-bin] ERROR: No binary archives found in lib directory.');
     return;
   }
   const archive = files.find(f => f.includes(pattern));
   if (!archive) {
-    console.error(`[oras-bin] ERROR: No file found matching pattern '${pattern}'. Files present:`, files);
     throw new Error(`No matching oras binary archive found for pattern: ${pattern}`);
   }
   const archivePath = path.join(libDir, archive);
+  console.log(`[oras-bin] Extracting: ${archive}`);
+  
+  // Extract to temp directory first
+  const tempDir = path.join(packageDir, '.temp-extract');
+  if (fs.existsSync(tempDir)) {
+    fs.rmSync(tempDir, { recursive: true });
+  }
+  fs.mkdirSync(tempDir, { recursive: true });
+  
   // Extract based on file type
   if (archive.endsWith('.tar.gz')) {
     await tar.x({
       file: archivePath,
-      cwd: binDir
+      cwd: tempDir
     });
   } else if (archive.endsWith('.zip')) {
     await fs.createReadStream(archivePath)
-      .pipe(unzipper.Extract({ path: binDir }))
+      .pipe(unzipper.Extract({ path: tempDir }))
       .promise();
   } else {
     throw new Error('Unsupported archive format: ' + archive);
   }
-  // Set executable permission for all files in .bin
-  const binFiles = fs.readdirSync(binDir);
-  for (const f of binFiles) {
-    const fullPath = path.join(binDir, f);
-    if (fs.statSync(fullPath).isFile()) {
-      fs.chmodSync(fullPath, 0o755);
-    }
+  
+  // Find and move only the oras binary to the target bin directory
+  const binaryName = platform === 'win32' ? 'oras.exe' : 'oras';
+  const extractedBinary = path.join(tempDir, binaryName);
+  const targetBinary = path.join(binDir, binaryName);
+  
+  if (!fs.existsSync(extractedBinary)) {
+    throw new Error(`Binary ${binaryName} not found in extracted archive`);
   }
-  // Clean up lib folder
+  
+  // Copy binary to target location
+  fs.copyFileSync(extractedBinary, targetBinary);
+  
+  // Set executable permission
+  fs.chmodSync(targetBinary, 0o755);
+  
+  // Clean up temp directory
+  fs.rmSync(tempDir, { recursive: true });
+  // Clean up lib folder (remove archives, keep hidden files like .keep)
   for (const f of files) {
-    if (!f.startsWith('.')) fs.rmSync(path.join(libDir, f));
+    fs.rmSync(path.join(libDir, f));
   }
+  
+  console.log('[oras-bin] Binary extraction complete');
 }
 
 // Await extraction and handle errors
