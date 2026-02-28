@@ -25,8 +25,8 @@ try {
     
     console.log('✓ CommonJS import test passed');
   } catch (binaryError) {
-    if (binaryError.message.includes('Binary directory not found')) {
-      console.log('⚠️  Binary directory not found - this is expected during development');
+    if (binaryError.message.includes('oras binary not found') || binaryError.message.includes('Binary directory not found')) {
+      console.log('⚠️  Binary not found - this is expected during CI/development');
       console.log('   The CommonJS import itself works correctly');
       console.log('✓ CommonJS import test passed (binary not available)');
     } else {
