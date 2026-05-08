@@ -1,8 +1,11 @@
 # oras-bin-wrapper
 
-Node.js wrapper for the [oras](https://github.com/oras-project/oras) CLI binaries. Automatically selects the correct binary for your OS and architecture after install.
+[![npm version](https://badge.fury.io/js/oras-bin-wrapper.svg)](https://www.npmjs.com/package/oras-bin-wrapper)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**✨ New: Dual Package Support!** This package now supports both CommonJS and ES Modules (ESM).
+Node.js wrapper for the [oras](https://github.com/oras-project/oras) CLI. Installs the correct binary for your OS/architecture and exports its path.
+
+Package versions are kept in sync with [oras releases](https://github.com/oras-project/oras/releases) — `oras-bin-wrapper@1.3.1` ships the `oras v1.3.1` binary.
 
 ## Installation
 
@@ -10,86 +13,78 @@ Node.js wrapper for the [oras](https://github.com/oras-project/oras) CLI binarie
 npm install oras-bin-wrapper
 ```
 
+On install, the binary matching your platform is extracted to `node_modules/.bin/oras`.
+
 ## Usage
 
 ### CommonJS
+
 ```js
-const getOrasBinaryPath = require('oras-bin-wrapper').default;
-const { getOrasBinaryPath: getPath } = require('oras-bin-wrapper');
+const { getOrasBinaryPath } = require('oras-bin-wrapper');
 const { spawnSync } = require('child_process');
 
-// Using default export (function)
-const binaryPath = getOrasBinaryPath();
-const result = spawnSync(binaryPath, ['version'], { encoding: 'utf-8' });
+const result = spawnSync(getOrasBinaryPath(), ['version'], { encoding: 'utf-8' });
 console.log(result.stdout);
-
-// Using named export function  
-const binaryPath2 = getPath();
-console.log('Binary located at:', binaryPath2);
 ```
 
-### ES Modules (ESM)
+### ES Modules
+
 ```js
-import getOrasBinaryPath, { getOrasBinaryPath as getPath } from 'oras-bin-wrapper';
+import { getOrasBinaryPath } from 'oras-bin-wrapper';
 import { spawnSync } from 'child_process';
 
-// Using default export (function)
-const binaryPath = getOrasBinaryPath();
-const result = spawnSync(binaryPath, ['version'], { encoding: 'utf-8' });
+const result = spawnSync(getOrasBinaryPath(), ['version'], { encoding: 'utf-8' });
 console.log(result.stdout);
-
-// Using named export function
-const binaryPath2 = getPath();
-console.log('Binary located at:', binaryPath2);
 ```
 
 ### TypeScript
+
 ```typescript
-import getOrasBinaryPath, { getOrasBinaryPath as getPath } from 'oras-bin-wrapper';
+import { getOrasBinaryPath } from 'oras-bin-wrapper';
 import { spawnSync } from 'child_process';
 
 const binaryPath: string = getOrasBinaryPath();
 const result = spawnSync(binaryPath, ['version'], { encoding: 'utf-8' });
+console.log(result.stdout);
 ```
-
-## How it works
-- On install, the binary matching your platform is extracted to `node_modules/.bin/oras` (making it available like any npm CLI tool).
-- The module exports the path to the binary for use with `child_process`.
-- All other platform binaries are deleted to reduce package size.
 
 ## Supported Platforms
-- macOS (darwin) - Intel (x64) and Apple Silicon (arm64)
-- Linux - x64 and arm64
-- Windows - x64
 
-## Updating Binaries
-- Run the `update-oras-binaries.sh` script to download the latest oras releases.
-- The postinstall script will automatically extract the correct binary for each user's platform.
+| OS      | Architecture       |
+| ------- | ------------------ |
+| macOS   | Intel (x64), ARM (arm64) |
+| Linux   | x64, arm64         |
+| Windows | x64                |
 
-## Features
+## How Releases Work
 
-- ✅ **Dual Package Support**: Works with both CommonJS (`require()`) and ES Modules (`import`)
-- ✅ **Cross-Platform**: Automatically detects and installs the correct binary for your OS/architecture
-- ✅ **TypeScript Support**: Full type definitions included
-- ✅ **Node.js 14+**: Compatible with modern Node.js versions
-- ✅ **Zero Dependencies**: No runtime dependencies (tar and unzipper only used during install)
+This package mirrors [oras releases](https://github.com/oras-project/oras/releases):
 
-## Testing
+1. Create a git tag matching the oras version: `git tag v1.3.1 && git push --tags`
+2. GitHub Actions automatically downloads all platform binaries for that version
+3. The package is built, tested, and published to npm
+
+Pre-release tags like `v1.4.0-beta.1` are published under their pre-release npm tag (e.g. `npm install oras-bin-wrapper@beta`).
+
+## Development
 
 ```sh
-# Run all tests
-npm test
+# Install (skips binary extraction in dev)
+ORAS_BIN_DEV=true npm install
 
-# Test CommonJS specifically
-npm run test:cjs
+# Build
+npm run build
 
-# Test ESM specifically  
-npm run test:esm
+# Download binaries locally (optional)
+npm run download-binaries        # latest stable
+bash update-oras-binaries.sh 1.3.1  # specific version
+
+# Test
+npm test          # TypeScript tests
+npm run test:cjs  # CommonJS
+npm run test:esm  # ESM
 ```
 
-## Publishing
-- Versioning and publishing are automated via GitHub Actions. See `.github/workflows/publish.yml`.
+## License
 
----
-
-MIT License
+MIT

@@ -131,3 +131,7 @@ dist
 lib_copy/*
 .bin/*
 .jfrog/*
+
+# Binary archives (downloaded in CI)
+lib/*.tar.gz
+lib/*.zip
