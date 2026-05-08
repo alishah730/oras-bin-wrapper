@@ -39,6 +39,8 @@ jobs:
 
       - name: Download oras binaries (latest)
         run: bash update-oras-binaries.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Build
         run: npm run build
