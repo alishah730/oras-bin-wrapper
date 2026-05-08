@@ -1,34 +1,65 @@
 #!/usr/bin/env bash
-
+#
+# Downloads oras CLI binaries for all supported platforms.
+# Usage:
+#   ./update-oras-binaries.sh          # fetches latest stable version
+#   ./update-oras-binaries.sh 1.3.1    # fetches a specific version
+#
 set -euo pipefail
 
-BIN_DIR="lib"  # Change to 'lib' if you want
-mkdir -p "$BIN_DIR"
+LIB_DIR="lib"
+mkdir -p "$LIB_DIR"
 
-# 1. Get latest stable (non-prerelease) version
-LATEST_VERSION=v$(curl -s https://api.github.com/repos/oras-project/oras/releases \
-  | grep -E '"tag_name":' \
-  | grep -vE 'beta|rc' \
-  | head -n1 \
-  | sed -E 's/.*"v([^"]+)".*/\1/')
-
-#LATEST_VERSION="v1.3.0-beta.4"
-
-# Remove leading 'v' for filenames
-VERSION_NO_V="${LATEST_VERSION#v}"
-
-echo "Latest ORAS version: $LATEST_VERSION"
-
-# 2. Download binaries
-BASE_URL="https://github.com/oras-project/oras/releases/download/$LATEST_VERSION"
-
-PLATFORMS=(
-  "windows_amd64"
-  "linux_amd64"
-  "linux_arm64"
-  "darwin_amd64"
-  "darwin_arm64"
+CURL_COMMON_ARGS=(
+  -fsSL
+  --retry 3
+  --retry-delay 2
+  -H "Accept: application/vnd.github+json"
+  -H "X-GitHub-Api-Version: 2022-11-28"
 )
+
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  CURL_COMMON_ARGS+=( -H "Authorization: Bearer ${GITHUB_TOKEN}" )
+fi
+
+resolve_latest_version() {
+  local version
+
+  # Prefer the latest endpoint to avoid relying on list ordering.
+  version=$(curl "${CURL_COMMON_ARGS[@]}" \
+    "https://api.github.com/repos/oras-project/oras/releases/latest" \
+    | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/p' \
+    | head -n1)
+
+  if [[ -z "${version}" ]]; then
+    # Fallback to the releases list and pick first stable tag.
+    version=$(curl "${CURL_COMMON_ARGS[@]}" \
+      "https://api.github.com/repos/oras-project/oras/releases" \
+      | grep -E '"tag_name"' \
+      | grep -vE 'beta|rc' \
+      | sed -nE 's/.*"v?([^"]+)".*/\1/p' \
+      | head -n1)
+  fi
+
+  if [[ -z "${version}" ]]; then
+    echo "Error: could not resolve latest ORAS version from GitHub API." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "${version}"
+}
+
+# Determine version: argument > latest stable release
+if [[ ${1:-} != "" ]]; then
+  VERSION_NO_V="${1#v}"
+else
+  VERSION_NO_V=$(resolve_latest_version)
+fi
+
+echo "ORAS version: v${VERSION_NO_V}"
+
+BASE_URL="https://github.com/oras-project/oras/releases/download/v${VERSION_NO_V}"
+
 FILES=(
   "oras_${VERSION_NO_V}_windows_amd64.zip"
   "oras_${VERSION_NO_V}_linux_amd64.tar.gz"
@@ -37,21 +68,12 @@ FILES=(
   "oras_${VERSION_NO_V}_darwin_arm64.tar.gz"
 )
 
-for i in "${!PLATFORMS[@]}"; do
-  url="$BASE_URL/${FILES[$i]}"
-  dest="$BIN_DIR/${FILES[$i]}"
-  echo "Downloading $url ..."
-  curl -L -o "$dest" "$url"
+# Clean existing archives
+rm -f "$LIB_DIR"/oras_*.tar.gz "$LIB_DIR"/oras_*.zip
+
+for file in "${FILES[@]}"; do
+  echo "Downloading ${file} ..."
+  curl "${CURL_COMMON_ARGS[@]}" -o "$LIB_DIR/${file}" "$BASE_URL/${file}"
 done
 
-# 3. Update version in package.json
-if command -v jq >/dev/null 2>&1; then
-  jq --arg v "$VERSION_NO_V" '.version = $v' package.json > package.tmp.json && mv package.tmp.json package.json
-  echo "Updated package.json to version $VERSION_NO_V"
-else
-  # Fallback: sed (will only work if version is on its own line)
-  sed -i.bak -E "s/\"version\": *\"[^\"]+\"/\"version\": \"$VERSION_NO_V\"/" package.json
-  echo "Updated package.json to version $VERSION_NO_V (with sed)"
-fi
-
-echo "Done."
+echo "Done. Binaries saved to $LIB_DIR/"

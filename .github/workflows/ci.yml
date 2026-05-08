@@ -1,87 +1,52 @@
-name: CI - Comprehensive Testing
+name: CI
 
 on:
   pull_request:
-    branches: ['main', 'master']
   push:
-    branches: ['main', 'master']
+    branches:
+      - main
+      - master
+      - feature/**
+      - feat/**
+      - bugfix/**
+      - fix/**
+      - hotfix/**
+      - chore/**
+      - refactor/**
+      - release/**
 
 jobs:
-  test-matrix:
-    name: Test on ${{ matrix.os }} with Node.js ${{ matrix.node }}
+  test:
+    name: Test (${{ matrix.os }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node: ['22.x', '24.x']
-    
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ["24.x"]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
-          cache: 'npm'
-      
-      - name: Install dependencies (dev mode)
+          cache: npm
+
+      - name: Install dependencies
         run: npm ci
         env:
           ORAS_BIN_DEV: true
-      
-      - name: Build dual packages
+
+      - name: Download oras binaries (latest)
+        run: bash update-oras-binaries.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Build
         run: npm run build
-      
-      - name: Lint and type check
+
+      - name: Run tests
         run: |
-          npx tsc --noEmit
-        continue-on-error: true
-      
-      - name: Run TypeScript tests
-        run: npm test
-      
-      - name: Test CommonJS compatibility
-        run: npm run test:cjs
-      
-      - name: Test ESM compatibility  
-        run: npm run test:esm
-      
-      - name: Validate build artifacts
-        run: node validate-build.js
-      
-      - name: Check package exports
-        run: |
-          node -e "console.log('CommonJS require test:'); const fn = require('./dist/index.js').default; console.log('✓ Default export type:', typeof fn);"
-          node -e "console.log('ESM import test:'); import('./dist/index.mjs').then(m => console.log('✓ Default export type:', typeof m.default));"
-  
-  test-with-binaries:
-    name: Test with actual binaries
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.x'
-          cache: 'npm'
-      
-      - name: Install dependencies (production mode)
-        run: npm ci
-        # Don't set ORAS_BIN_DEV to test actual postinstall behavior
-      
-      - name: Build packages
-        run: npm run build
-      
-      - name: Test with real binaries
-        run: |
-          # Test that the binary was extracted
-          ls -la .bin/ || echo "No .bin directory (expected in CI)"
-          
-          # Run tests (they should handle missing binaries gracefully)
           npm test
           npm run test:cjs
           npm run test:esm

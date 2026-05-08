@@ -1,137 +1,146 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBinaryPattern = getBinaryPattern;
-exports.extractBinary = extractBinary;
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
-const os = __importStar(require("os"));
-const tar = __importStar(require("tar"));
-const unzipper = __importStar(require("unzipper"));
 /**
- * Skips binary extraction in CI/CD and dev environments.
- * Ensures postinstall only runs for end users, never in CI or during publish.
+ * oras-bin-wrapper postinstall script
+ * Extracts the appropriate oras binary for the current platform
+ */
+"use strict";
+
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const tar = require("tar");
+const unzipper = require("unzipper");
+
+/**
+ * Check if this is a dev install (skip extraction if ORAS_BIN_DEV=true)
  */
 function isDevInstall() {
-    console.log('[oras-bin] Checking if this is a dev install...', process.env);
-    // return !(
-    //   process.env.ORAS_BIN_DEV ||
-    //   process.env.npm_lifecycle_event === 'build' ||
-    //   process.env.npm_config_argv?.includes('link')
-    // )
-    return process.env.ORAS_BIN_DEV === 'true';
+  return process.env.ORAS_BIN_DEV === 'true';
 }
+
+/**
+ * Get the binary archive pattern for the current platform/arch
+ */
 function getBinaryPattern(platform, arch) {
-    if (platform === 'darwin') {
-        if (arch === 'arm64')
-            return 'darwin_arm64';
-        if (arch === 'x64')
-            return 'darwin_amd64';
-    }
-    else if (platform === 'linux') {
-        if (arch === 'x64')
-            return 'linux_amd64';
-        if (arch === 'arm64')
-            return 'linux_arm64';
-    }
-    else if (platform === 'win32') {
-        if (arch === 'x64')
-            return 'windows_amd64';
-    }
-    throw new Error(`Unsupported platform/arch: ${platform}/${arch}`);
+  if (platform === 'darwin') {
+    if (arch === 'arm64') return 'darwin_arm64';
+    if (arch === 'x64') return 'darwin_amd64';
+  } else if (platform === 'linux') {
+    if (arch === 'x64') return 'linux_amd64';
+    if (arch === 'arm64') return 'linux_arm64';
+  } else if (platform === 'win32') {
+    if (arch === 'x64') return 'windows_amd64';
+  }
+  throw new Error(`Unsupported platform/arch: ${platform}/${arch}`);
 }
+
+/**
+ * Get the root project's node_modules/.bin directory.
+ * When installed as a dependency: project/node_modules/.bin
+ * When running locally (dev): oras-bin-wrapper/.bin
+ */
+function getRootBinDir() {
+  const packageDir = __dirname;
+  
+  // Check if we're installed as a dependency (inside node_modules/oras-bin-wrapper)
+  const parentDir = path.dirname(packageDir);
+  if (path.basename(parentDir) === 'node_modules') {
+    // We're in node_modules/oras-bin-wrapper, so root bin is node_modules/.bin
+    return path.join(parentDir, '.bin');
+  }
+  
+  // Local development - use .bin in package directory
+  return path.join(packageDir, '.bin');
+}
+
+/**
+ * Extract the oras binary for the current platform
+ */
 async function extractBinary() {
-    if (isDevInstall()) {
-        console.log('[oras-bin] Skipping binary extraction/cleanup (dev mode/CI detected)');
-        return;
-    }
-    const libDir = path.resolve(__dirname, 'lib');
-    const binDir = path.resolve(__dirname, '.bin');
-    if (!fs.existsSync(libDir)) {
-        console.error('[oras-bin] ERROR: lib directory does not exist. Please add compressed oras binaries to lib/.');
-        return;
-    }
-    if (!fs.existsSync(binDir))
-        fs.mkdirSync(binDir);
-    const platform = os.platform();
-    const arch = os.arch();
-    const pattern = getBinaryPattern(platform, arch);
-    const files = fs.readdirSync(libDir);
-    console.log(`[oras-bin] Files in lib:`, files);
-    console.log(`[oras-bin] Extracting binary for platform: ${platform}, arch: ${arch}, pattern: ${pattern}`);
-    if (files.length === 0) {
-        console.error('[oras-bin] ERROR: No files found in lib directory.');
-        return;
-    }
-    const archive = files.find(f => f.includes(pattern));
-    if (!archive) {
-        console.error(`[oras-bin] ERROR: No file found matching pattern '${pattern}'. Files present:`, files);
-        throw new Error(`No matching oras binary archive found for pattern: ${pattern}`);
-    }
-    const archivePath = path.join(libDir, archive);
-    // Extract based on file type
-    if (archive.endsWith('.tar.gz')) {
-        await tar.x({
-            file: archivePath,
-            cwd: binDir
-        });
-    }
-    else if (archive.endsWith('.zip')) {
-        await fs.createReadStream(archivePath)
-            .pipe(unzipper.Extract({ path: binDir }))
-            .promise();
-    }
-    else {
-        throw new Error('Unsupported archive format: ' + archive);
-    }
-    // Set executable permission for all files in .bin
-    const binFiles = fs.readdirSync(binDir);
-    for (const f of binFiles) {
-        const fullPath = path.join(binDir, f);
-        if (fs.statSync(fullPath).isFile()) {
-            fs.chmodSync(fullPath, 0o755);
-        }
-    }
-    // Clean up lib folder
-    for (const f of files) {
-        if (!f.startsWith('.'))
-            fs.rmSync(path.join(libDir, f));
-    }
+  if (isDevInstall()) {
+    console.log('[oras-bin] Skipping binary extraction (dev mode detected)');
+    return;
+  }
+
+  const libDir = path.resolve(__dirname, 'lib');
+  const binDir = getRootBinDir();
+
+  if (!fs.existsSync(libDir)) {
+    console.error('[oras-bin] ERROR: lib directory does not exist.');
+    return;
+  }
+
+  if (!fs.existsSync(binDir)) {
+    fs.mkdirSync(binDir, { recursive: true });
+  }
+
+  const platform = os.platform();
+  const arch = os.arch();
+  const pattern = getBinaryPattern(platform, arch);
+  const files = fs.readdirSync(libDir).filter(f => !f.startsWith('.'));
+
+  console.log(`[oras-bin] Extracting binary for ${platform}/${arch}`);
+
+  if (files.length === 0) {
+    console.error('[oras-bin] ERROR: No binary archives found in lib directory.');
+    return;
+  }
+
+  const archive = files.find(f => f.includes(pattern));
+  if (!archive) {
+    throw new Error(`No matching oras binary archive found for pattern: ${pattern}`);
+  }
+
+  const archivePath = path.join(libDir, archive);
+  console.log(`[oras-bin] Extracting: ${archive}`);
+
+  // Extract based on file type - use temp directory first
+  const tempDir = path.join(__dirname, '.temp-extract');
+  if (fs.existsSync(tempDir)) {
+    fs.rmSync(tempDir, { recursive: true });
+  }
+  fs.mkdirSync(tempDir, { recursive: true });
+  
+  if (archive.endsWith('.tar.gz')) {
+    await tar.x({
+      file: archivePath,
+      cwd: tempDir
+    });
+  } else if (archive.endsWith('.zip')) {
+    await fs.createReadStream(archivePath)
+      .pipe(unzipper.Extract({ path: tempDir }))
+      .promise();
+  } else {
+    throw new Error('Unsupported archive format: ' + archive);
+  }
+
+  // Find and move only the oras binary to the target bin directory
+  const binaryName = platform === 'win32' ? 'oras.exe' : 'oras';
+  const extractedBinary = path.join(tempDir, binaryName);
+  const targetBinary = path.join(binDir, binaryName);
+  
+  if (!fs.existsSync(extractedBinary)) {
+    throw new Error(`Binary ${binaryName} not found in extracted archive`);
+  }
+  
+  // Copy binary to target location
+  fs.copyFileSync(extractedBinary, targetBinary);
+  
+  // Set executable permission
+  fs.chmodSync(targetBinary, 0o755);
+  
+  // Clean up temp directory
+  fs.rmSync(tempDir, { recursive: true });
+
+  // Clean up lib folder (remove archives, keep .keep files)
+  for (const f of files) {
+    fs.rmSync(path.join(libDir, f));
+  }
+
+  console.log('[oras-bin] Binary extraction complete');
 }
-// Await extraction and handle errors
+
+// Run extraction
 extractBinary().catch((err) => {
-    console.error('[oras-bin] Extraction failed:', err);
-    process.exit(1);
+  console.error('[oras-bin] Extraction failed:', err);
+  process.exit(1);
 });
