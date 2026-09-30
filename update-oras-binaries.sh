@@ -34,7 +34,7 @@ resolve_latest_version() {
   if [[ -z "${version}" ]]; then
     # Fallback to the releases list and pick first stable tag.
     version=$(curl "${CURL_COMMON_ARGS[@]}" \
-      "https://api.github.com/repos/oras-project/oras/releases" \
+      "https://api.github.com/repos/alishah730/oras/releases" \
       | grep -E '"tag_name"' \
       | grep -vE 'beta|rc' \
       | sed -nE 's/.*"v?([^"]+)".*/\1/p' \
@@ -58,7 +58,7 @@ fi
 
 echo "ORAS version: v${VERSION_NO_V}"
 
-BASE_URL="https://github.com/oras-project/oras/releases/download/v${VERSION_NO_V}"
+BASE_URL="https://github.com/alishah730/oras/releases/download/v${VERSION_NO_V}"
 
 FILES=(
   "oras_${VERSION_NO_V}_windows_amd64.zip"
