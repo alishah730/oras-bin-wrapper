@@ -27,7 +27,7 @@ resolve_latest_version() {
 
   # Prefer the latest endpoint to avoid relying on list ordering.
   version=$(curl "${CURL_COMMON_ARGS[@]}" \
-    "https://api.github.com/repos/oras-project/oras/releases/latest" \
+    "https://api.github.com/repos/alishah730/oras/releases/latest" \
     | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v?([^"]+)".*/\1/p' \
     | head -n1)
 
